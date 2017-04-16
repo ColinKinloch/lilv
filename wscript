@@ -58,6 +58,8 @@ def options(opt):
     opt.add_option('--default-lv2-path', type='string', default='',
                    dest='default_lv2_path',
                    help='Default LV2 path to use if LV2_PATH is unset')
+    opt.add_option('--android', action='store_true', dest='android',
+                   help='Build for android')
 
 def configure(conf):
     conf.load('compiler_c')
@@ -76,11 +78,12 @@ def configure(conf):
     autowaf.display_header('Lilv Configuration')
 
     conf.env.BASH_COMPLETION = not Options.options.no_bash_completion
-    conf.env.BUILD_UTILS     = not Options.options.no_utils
+    conf.env.BUILD_UTILS     = not (Options.options.android or Options.options.no_utils)
     conf.env.BUILD_SHARED    = not Options.options.no_shared
     conf.env.STATIC_PROGS    = Options.options.static_progs
     conf.env.BUILD_STATIC    = (Options.options.static or
                                 Options.options.static_progs)
+    conf.env.ANDROID         = Options.options.android
 
     if not conf.env.BUILD_SHARED and not conf.env.BUILD_STATIC:
         conf.fatal('Neither a shared nor a static build requested')
@@ -220,6 +223,15 @@ def build(bld):
     lib      = []
     libflags = ['-fvisibility=hidden']
     defines  = []
+    includes = ['.', './src']
+    ldflags  = []
+    libpath  = []
+
+    if bld.env.ANDROID:
+        includes += [bld.env.PREFIX + '/include/']
+        ldflags  += ['--sysroot=' + bld.env.PREFIX + '/..']
+        libpath  += [bld.env.PREFIX + '/lib/']
+
     if bld.is_defined('HAVE_LIBDL'):
         lib    += ['dl']
     if bld.env.DEST_OS == 'win32':
@@ -239,14 +251,16 @@ def build(bld):
         obj = bld(features        = 'c cshlib',
                   export_includes = ['.'],
                   source          = lib_source,
-                  includes        = ['.', './src'],
+                  includes        = includes,
                   name            = 'liblilv',
                   target          = 'lilv-%s' % LILV_MAJOR_VERSION,
                   vnum            = LILV_VERSION,
                   install_path    = '${LIBDIR}',
                   defines         = ['LILV_SHARED', 'LILV_INTERNAL'],
                   cflags          = libflags,
-                  lib             = lib)
+                  lib             = lib,
+                  libpath         = libpath,
+                  ldflags         = ldflags)
         autowaf.use_lib(bld, obj, 'SERD SORD SRATOM LV2')
 
     # Static library
@@ -254,12 +268,14 @@ def build(bld):
         obj = bld(features        = 'c cstlib',
                   export_includes = ['.'],
                   source          = lib_source,
-                  includes        = ['.', './src'],
+                  includes        = includes,
                   name            = 'liblilv_static',
                   target          = 'lilv-%s' % LILV_MAJOR_VERSION,
                   vnum            = LILV_VERSION,
                   install_path    = '${LIBDIR}',
-                  defines         = defines + ['LILV_INTERNAL'])
+                  defines         = defines + ['LILV_INTERNAL'],
+                  libpath         = libpath,
+                  ldflags         = ldflags)
         autowaf.use_lib(bld, obj, 'SERD SORD SRATOM LV2')
 
     # Python bindings
