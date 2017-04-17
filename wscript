@@ -231,6 +231,7 @@ def build(bld):
         includes += [bld.env.PREFIX + '/include/']
         ldflags  += ['--sysroot=' + bld.env.PREFIX + '/..']
         libpath  += [bld.env.PREFIX + '/lib/']
+        bld.env.HAVE_SNDFILE = False
 
     if bld.is_defined('HAVE_LIBDL'):
         lib    += ['dl']
